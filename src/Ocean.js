@@ -202,10 +202,11 @@ export class Ocean {
             float sTex = fbm(vWorldPos.xz * 0.5 - uWindDir * uTime * 0.6, 4);
             shoreFoam = shore * smoothstep(0.15, 0.55, sTex);
 
-            // Subsurface translucency through the back of crests.
-            float back  = pow(max(dot(V, -sunDir), 0.0), 3.0);
-            float crest = smoothstep(0.15, 1.1, vHeight);
-            color += uSSSColor * back * crest * (0.7 + 0.3 * sunElev) * 1.5;
+            // Subsurface translucency: a subtle glow through thin, back-lit
+            // crests only — kept gentle so it never washes the sea cyan.
+            float back  = pow(max(dot(V, -sunDir), 0.0), 4.0);
+            float crest = smoothstep(0.4, 1.8, vHeight) * max(N.y, 0.0);
+            color += uSSSColor * back * crest * sunElev * 0.35;
 
             // Crisp sun sparkle riding on the ripple normals.
             vec3 H = normalize(V + sunDir);
