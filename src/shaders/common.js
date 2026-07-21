@@ -193,6 +193,47 @@ export const OCEAN_GERSTNER = /* glsl */ `
   }
 `;
 
+/* Vertical-only ocean height (the same summed-Gerstner displacement the surface
+   uses, minus the horizontal choppiness). Lets the seabed / island know where
+   the real wavy water surface is, so caustics and wet sand only appear where
+   water actually covers them. Expects `uTime` and hash21() already in scope. */
+export const OCEAN_HEIGHT = /* glsl */ `
+  #ifndef MAX_WAVES
+  #define MAX_WAVES 40
+  #endif
+  uniform vec2  uWindDir;
+  uniform float uWaveCount;
+  uniform float uBaseFreq;
+  uniform float uAmplitude;
+  uniform float uDirSpread;
+  uniform float uFreqMul;
+  uniform float uAmpMul;
+  uniform float uSpeed;
+  uniform float uSurfaceY;
+
+  float oceanHeight(vec2 pos){
+    float baseAngle = atan(uWindDir.y, uWindDir.x);
+    float freq = uBaseFreq;
+    float amp  = uAmplitude;
+    int   count = int(uWaveCount);
+    float h = 0.0;
+    for (int i = 0; i < MAX_WAVES; i++){
+      if (i >= count) break;
+      float fi = float(i);
+      float r0 = hash21(vec2(fi, 1.7));
+      float r1 = hash21(vec2(fi, 9.1));
+      float angle = baseAngle + (r0 * 2.0 - 1.0) * uDirSpread;
+      vec2  d = vec2(cos(angle), sin(angle));
+      float phase = sqrt(9.81 * freq) * uSpeed;
+      float arg = freq * dot(d, pos) + uTime * phase + r1 * 6.2831853;
+      h += amp * sin(arg);
+      freq *= uFreqMul;
+      amp  *= uAmpMul;
+    }
+    return uSurfaceY + h;
+  }
+`;
+
 /* Fine-scale detail normal from scrolling FBM gradients — adds the crisp
    ripple that the vertex grid is too coarse to resolve. */
 export const DETAIL_NORMAL = /* glsl */ `

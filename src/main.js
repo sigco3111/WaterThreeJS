@@ -103,7 +103,7 @@ scene.add(ocean.mesh);
 const floor = new Floor(sunDir, FLOOR_DEPTH);
 scene.add(floor.mesh);
 
-const island = new Island(sunDir, FLOOR_DEPTH);
+const island = new Island(sunDir, FLOOR_DEPTH, ocean.uniforms);
 scene.add(island.mesh);
 
 const particles = new Particles(5000, 160);
@@ -172,8 +172,10 @@ function addColorCtrl(folder, uniform, name) {
 
 const fSurf = gui.addFolder('Surface');
 fSurf.add(ocean.uniforms.uDetailStrength, 'value', 0.0, 1.2, 0.02).name('ripple detail');
+fSurf.add(ocean.uniforms.uDetailScale, 'value', 0.05, 1.2, 0.01).name('ripple scale');
 fSurf.add(ocean.uniforms.uRefractStrength, 'value', 0.0, 0.12, 0.005).name('refraction');
 fSurf.add(ocean.uniforms.uSSRStrength, 'value', 0.0, 1.0, 0.02).name('reflections (SSR)');
+fSurf.add(ocean.uniforms.uSunGlitter, 'value', 0.0, 1.0, 0.02).name('sun glitter');
 
 const fColor = gui.addFolder('Water & colour');
 fColor.add(ocean.uniforms.uClarity, 'value', 0.3, 3.0, 0.05).name('clarity');

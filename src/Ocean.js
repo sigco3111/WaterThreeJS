@@ -28,6 +28,7 @@ export const OCEAN_CONFIG = {
   depthFalloff: 0.16,  // how fast the water body darkens with depth
   sssStrength: 0.35,   // subsurface translucency amount
   ssrStrength: 0.85,   // screen-space reflection blend (scene reflected on water)
+  sunGlitter: 0.35,    // shatters the reflected sun into sparkles (vs a solid streak)
   foamThreshold: 0.2,
   foamSoftness: 0.4,
   crestFoamStart: 1.4, // wave height (m) at which whitecaps begin (calm = rare)
@@ -75,6 +76,7 @@ export class Ocean {
       uDepthFalloff: { value: c.depthFalloff },
       uSSSStrength: { value: c.sssStrength },
       uSSRStrength: { value: c.ssrStrength },
+      uSunGlitter: { value: c.sunGlitter },
       uProjMatrix: { value: new THREE.Matrix4() },
       uFoamThreshold: { value: c.foamThreshold },
       uFoamSoftness: { value: c.foamSoftness },
@@ -143,6 +145,7 @@ export class Ocean {
         uniform float uDepthFalloff;
         uniform float uSSSStrength;
         uniform float uSSRStrength;
+        uniform float uSunGlitter;
         uniform mat4  uProjMatrix;   // fragment prefix lacks projectionMatrix
         uniform float uFoamThreshold;
         uniform float uFoamSoftness;
@@ -235,8 +238,15 @@ export class Ocean {
 
           if (!underwater){
             // ================= ABOVE WATER =================
-            vec3 R = reflect(-V, N);
-            vec3 Rsky = R; Rsky.y = max(Rsky.y, 0.015);
+            // Jitter the reflection normal with faded high-frequency sparkle so
+            // the reflected sun shatters into moving glitter instead of a solid
+            // streak (very visible on calm water at a low sunset sun).
+            vec3 spk = detailNormal(vWorldPos.xz * uDetailScale * 16.0, uTime * 2.5, 1.0);
+            vec3 Nr = normalize(N + vec3(spk.x, 0.0, spk.z) * uSunGlitter * detFade);
+            vec3 R = reflect(-V, Nr);
+            // Fold rays that dip below the horizon back up (mirror) instead of
+            // clamping to a constant elevation.
+            vec3 Rsky = R; Rsky.y = abs(Rsky.y);
             vec3 reflection = atmosphere(Rsky, sunDir);
 
             // Reflect the actual scene (island, seabed) via screen-space rays,
@@ -356,7 +366,10 @@ export class Ocean {
           // ================= HORIZON / DISTANCE =================
           if (!underwater){
             vec3 horizonDir = normalize(vec3(-V.x, 0.02, -V.z));
-            vec3 fogCol = atmosphere(horizonDir, sunDir);
+            // Cap the haze colour: the sun disk is intentionally ×14 bright for
+            // glints/bloom, but it must NOT leak into the distance fog or it
+            // paints a hard vertical beam straight down the sun's azimuth.
+            vec3 fogCol = min(atmosphere(horizonDir, sunDir), vec3(1.6));
             float fogAmt = 1.0 - exp(-dist * 0.00045);
             color = mix(color, fogCol, clamp(fogAmt, 0.0, 1.0));
           } else {
