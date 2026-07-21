@@ -237,6 +237,6 @@ export const CAUSTICS = /* glsl */ `
 // Physical-ish absorption coefficients for clear ocean water (per metre),
 // reused by the ocean surface and the underwater fog so the palette matches.
 export const WATER_TINT = /* glsl */ `
-  const vec3 ABSORB = vec3(0.42, 0.08, 0.022);  // clear water: red dies fast, blue travels far
+  const vec3 ABSORB = vec3(0.45, 0.09, 0.04);   // red dies fast; blue travels but deep still darkens
   const vec3 SCATTER = vec3(0.11, 0.28, 0.36);  // in-scattered teal
 `;

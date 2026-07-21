@@ -164,11 +164,29 @@ fWaves
   .name('swell length')
   .onChange((v) => (ocean.uniforms.uBaseFreq.value = (2 * Math.PI) / v));
 
+// lil-gui colour control bound to a THREE.Color uniform (sRGB picker ⇄ linear).
+function addColorCtrl(folder, uniform, name) {
+  const proxy = { c: '#' + uniform.value.getHexString() };
+  folder.addColor(proxy, 'c').name(name).onChange((v) => uniform.value.set(v));
+}
+
 const fSurf = gui.addFolder('Surface');
 fSurf.add(ocean.uniforms.uDetailStrength, 'value', 0.0, 1.2, 0.02).name('ripple detail');
 fSurf.add(ocean.uniforms.uRefractStrength, 'value', 0.0, 0.12, 0.005).name('refraction');
+fSurf.add(ocean.uniforms.uSSRStrength, 'value', 0.0, 1.0, 0.02).name('reflections (SSR)');
+
+const fColor = gui.addFolder('Water & colour');
+fColor.add(ocean.uniforms.uClarity, 'value', 0.3, 3.0, 0.05).name('clarity');
+fColor.add(ocean.uniforms.uDepthFalloff, 'value', 0.03, 0.5, 0.01).name('depth falloff');
+fColor.add(ocean.uniforms.uSSSStrength, 'value', 0.0, 1.5, 0.02).name('translucency');
+addColorCtrl(fColor, ocean.uniforms.uShallowColor, 'shallow');
+addColorCtrl(fColor, ocean.uniforms.uDeepColor, 'deep');
+addColorCtrl(fColor, ocean.uniforms.uFoamColor, 'foam');
 
 const fFoam = gui.addFolder('Foam');
+fFoam.add(ocean.uniforms.uFoamCoverage, 'value', 0.0, 2.0, 0.05).name('coverage');
+fFoam.add(ocean.uniforms.uFoamEdge, 'value', 0.02, 0.45, 0.01).name('softness / layers');
+fFoam.add(ocean.uniforms.uFoamOpacity, 'value', 0.3, 1.0, 0.02).name('opacity');
 fFoam.add(ocean.uniforms.uCrestFoamStart, 'value', 0.3, 3.0, 0.05).name('whitecap onset');
 fFoam.add(ocean.uniforms.uFoamThreshold, 'value', 0.0, 1.0, 0.02).name('breaking foam');
 fFoam.add(ocean.uniforms.uShoreFoamWidth, 'value', 0.0, 8.0, 0.1).name('shore foam width');
@@ -267,6 +285,7 @@ function animate() {
   sky.update(camera, time);
 
   ocean.uniforms.uCameraUnderwater.value = underwater ? 1 : 0;
+  ocean.uniforms.uProjMatrix.value.copy(camera.projectionMatrix);
   post.underwaterMat.uniforms.uTime.value = time;
 
   renderer.setClearColor(OCEAN_CONFIG.deepColor, 1);

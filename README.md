@@ -11,10 +11,17 @@ generated in shaders.
 - Spectral **Gerstner wave** field — dozens of waves spanning long swells down to
   fine chop, generated procedurally with deep-water dispersion so long waves
   travel faster than short ones.
+- **Screen-space reflections**: the reflection ray is marched through the
+  pre-water colour+depth buffer, so the island (and anything above water) is
+  mirrored on the surface, falling back to the sky where the ray finds nothing.
+- Three cascades of scrolling **detail normals** (coarse → capillary, the finest
+  distance-faded to stop the horizon shimmering) layered over the Gerstner base.
 - Physically-based shading: Schlick **Fresnel**, sky **reflection**, depth-based
-  **refraction** with Beer–Lambert absorption, **subsurface scattering** that lights
-  up the backs of crests, sharp **sun glints**, and churning **whitecap foam** —
-  broad on wave crests, extra on breaking folds, textured by advecting noise.
+  **refraction** with Beer–Lambert absorption (bright turquoise shallows fading to
+  dark saturated deep), **subsurface scattering** on back-lit crests, sharp
+  **sun glints**, and **layered foam** — a dense cap on breaking crests that
+  dissolves softly into feathered, flow-aligned trails, so it never looks like a
+  hard white stamp.
 - A shared analytic **atmosphere** with **drifting procedural clouds** powers both
   the sky dome and the water reflections, so the horizon, clouds and sun always
   match exactly — the sea reflects the same cloudscape overhead. Full time-of-day
@@ -33,8 +40,10 @@ generated in shaders.
 - Raymarched **volumetric god-rays** reconstructed from the depth buffer and
   modulated by a caustic pattern projected along the sun direction.
 - Animated **caustics** on a rolling, rippled sandy **seabed**.
-- **Snell's window**: from below, the surface shows the compressed bright disc of
-  refracted sky ringed by total internal reflection.
+- **Snell's window**: from below, the surface reads as a bright, clear rippling
+  ceiling — the whole sky refracted through the window with silvery caustic
+  shimmer, the water glowing sunlit turquoise toward the surface (never black)
+  and darkening with depth.
 - Drifting **marine-snow** particles for a sense of scale.
 
 **Pipeline**

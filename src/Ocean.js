@@ -23,14 +23,21 @@ export const OCEAN_CONFIG = {
   surfaceY: 0.0,
   refractStrength: 0.05,
   detailScale: 0.3,
-  detailStrength: 0.12,
+  detailStrength: 0.14,
+  clarity: 1.0,        // scales water absorption (higher = see deeper)
+  depthFalloff: 0.16,  // how fast the water body darkens with depth
+  sssStrength: 0.35,   // subsurface translucency amount
+  ssrStrength: 0.85,   // screen-space reflection blend (scene reflected on water)
   foamThreshold: 0.2,
   foamSoftness: 0.4,
   crestFoamStart: 1.4, // wave height (m) at which whitecaps begin (calm = rare)
   shoreFoamWidth: 3.4, // water-column depth (m) over which shore foam builds
-  deepColor: new THREE.Color(0.003, 0.05, 0.1),
-  shallowColor: new THREE.Color(0.12, 0.55, 0.55),
-  foamColor: new THREE.Color(0.94, 0.97, 0.99),
+  foamCoverage: 1.0,   // overall foam amount
+  foamEdge: 0.2,       // dissolve softness — high = soft, layered, feathered foam
+  foamOpacity: 0.95,
+  deepColor: new THREE.Color(0.0016, 0.032, 0.065), // dark saturated deep
+  shallowColor: new THREE.Color(0.13, 0.56, 0.55),
+  foamColor: new THREE.Color(0.95, 0.98, 1.0),
   sssColor: new THREE.Color(0.1, 0.52, 0.46),
 };
 
@@ -64,10 +71,18 @@ export class Ocean {
       uRefractStrength: { value: c.refractStrength },
       uDetailScale: { value: c.detailScale },
       uDetailStrength: { value: c.detailStrength },
+      uClarity: { value: c.clarity },
+      uDepthFalloff: { value: c.depthFalloff },
+      uSSSStrength: { value: c.sssStrength },
+      uSSRStrength: { value: c.ssrStrength },
+      uProjMatrix: { value: new THREE.Matrix4() },
       uFoamThreshold: { value: c.foamThreshold },
       uFoamSoftness: { value: c.foamSoftness },
       uCrestFoamStart: { value: c.crestFoamStart },
       uShoreFoamWidth: { value: c.shoreFoamWidth },
+      uFoamCoverage: { value: c.foamCoverage },
+      uFoamEdge: { value: c.foamEdge },
+      uFoamOpacity: { value: c.foamOpacity },
       uDeepColor: { value: c.deepColor.clone() },
       uShallowColor: { value: c.shallowColor.clone() },
       uFoamColor: { value: c.foamColor.clone() },
@@ -124,10 +139,18 @@ export class Ocean {
         uniform float uRefractStrength;
         uniform float uDetailScale;
         uniform float uDetailStrength;
+        uniform float uClarity;
+        uniform float uDepthFalloff;
+        uniform float uSSSStrength;
+        uniform float uSSRStrength;
+        uniform mat4  uProjMatrix;   // fragment prefix lacks projectionMatrix
         uniform float uFoamThreshold;
         uniform float uFoamSoftness;
         uniform float uCrestFoamStart;
         uniform float uShoreFoamWidth;
+        uniform float uFoamCoverage;
+        uniform float uFoamEdge;
+        uniform float uFoamOpacity;
         uniform vec3  uDeepColor;
         uniform vec3  uShallowColor;
         uniform vec3  uFoamColor;
@@ -152,17 +175,56 @@ export class Ocean {
           return -perspectiveDepthToViewZ(d, uNear, uFar); // positive metres
         }
 
+        // Screen-space reflection: march the reflection ray through the
+        // pre-water colour+depth target so the island (and anything above water)
+        // is mirrored on the surface. Returns rgb + a confidence in .a.
+        #define SSR_STEPS 32
+        vec4 ssr(vec3 ro, vec3 rd){
+          float stepLen = 2.2;
+          float prevDiff = -1.0;
+          vec2  prevUV = vec2(0.0);
+          for (int i = 1; i <= SSR_STEPS; i++){
+            vec3 p = ro + rd * (stepLen * float(i));
+            vec4 clip = uProjMatrix * viewMatrix * vec4(p, 1.0);
+            if (clip.w <= 0.0) break;
+            vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+            if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+            float sceneEye = sceneEyeDepth(uv);
+            float rayEye = -(viewMatrix * vec4(p, 1.0)).z;
+            float diff = rayEye - sceneEye;          // >0 → ray is behind the scene
+            if (diff > 0.0 && diff < 6.0 && sceneEye < uFar * 0.97){
+              // Refine between the last two samples for a cleaner hit.
+              float t = prevDiff < 0.0 ? 1.0 : (-prevDiff / (diff - prevDiff));
+              vec2 hitUV = mix(prevUV, uv, clamp(t, 0.0, 1.0));
+              vec2 edge = smoothstep(0.0, 0.14, hitUV) * smoothstep(0.0, 0.14, 1.0 - hitUV);
+              float conf = edge.x * edge.y * (1.0 - float(i) / float(SSR_STEPS) * 0.4);
+              return vec4(texture2D(uRefractionTex, hitUV).rgb, conf);
+            }
+            prevDiff = diff;
+            prevUV = uv;
+            stepLen *= 1.06;                          // gently accelerate
+          }
+          return vec4(0.0);
+        }
+
         void main(){
           vec3 sunDir = normalize(uSunDir);
           vec3 V = normalize(cameraPosition - vWorldPos);
           float sunElev = clamp(sunDir.y, 0.0, 1.0);
+          float dist = length(cameraPosition - vWorldPos);
 
-          // Base Gerstner normal + fine scrolling ripple detail.
+          // Base Gerstner normal + three scrolling ripple cascades (coarse →
+          // capillary) for organic, non-tiling detail. The finest layers fade
+          // with distance so the horizon doesn't shimmer/alias.
           vec3 N = normalize(vNormal);
-          vec3 dN = detailNormal(vWorldPos.xz * uDetailScale, uTime, 1.0);
-          N = normalize(vec3(N.x + dN.x * uDetailStrength,
-                             N.y,
-                             N.z + dN.z * uDetailStrength));
+          float detFade = exp(-dist * 0.012);
+          vec3 dN1 = detailNormal(vWorldPos.xz * uDetailScale, uTime, 1.0);
+          vec3 dN2 = detailNormal(vWorldPos.xz * uDetailScale * 3.7 + 11.0, uTime * 1.35, 1.0);
+          vec3 dN3 = detailNormal(vWorldPos.xz * uDetailScale * 11.0 + 31.0, uTime * 1.9, 1.0);
+          vec2 dsum = dN1.xz * uDetailStrength
+                    + dN2.xz * uDetailStrength * 0.5 * mix(0.35, 1.0, detFade)
+                    + dN3.xz * uDetailStrength * 0.28 * detFade;
+          N = normalize(vec3(N.x + dsum.x, N.y, N.z + dsum.y));
           vec3 Ns = N.y >= 0.0 ? N : -N;      // geometric up (points to the air)
           if (dot(N, V) < 0.0) N = -N;         // shading normal faces the viewer
 
@@ -174,8 +236,15 @@ export class Ocean {
           if (!underwater){
             // ================= ABOVE WATER =================
             vec3 R = reflect(-V, N);
-            R.y = max(R.y, 0.015);
-            vec3 reflection = atmosphere(R, sunDir);
+            vec3 Rsky = R; Rsky.y = max(Rsky.y, 0.015);
+            vec3 reflection = atmosphere(Rsky, sunDir);
+
+            // Reflect the actual scene (island, seabed) via screen-space rays,
+            // falling back to the sky where the ray finds nothing.
+            if (uSSRStrength > 0.001){
+              vec4 s = ssr(vWorldPos, R);
+              reflection = mix(reflection, s.rgb, clamp(s.a, 0.0, 1.0) * uSSRStrength);
+            }
 
             float fres = fresnelF(max(dot(N, V), 0.0), 0.02);
 
@@ -190,9 +259,9 @@ export class Ocean {
             // dimmed by the water column. Bright turquoise over shallow sand,
             // fading to dark saturated deep — the tropical depth gradient.
             vec3 sceneCol = texture2D(uRefractionTex, rUV).rgb;
-            vec3 T = exp(-ABSORB * thickness);                 // background transmittance
-            vec3 waterCol = mix(uShallowColor, uDeepColor, 1.0 - exp(-thickness * 0.14));
-            waterCol *= 0.55 + 0.45 * sunElev;
+            vec3 T = exp(-(ABSORB / uClarity) * thickness);    // background transmittance
+            vec3 waterCol = mix(uShallowColor, uDeepColor, 1.0 - exp(-thickness * uDepthFalloff));
+            waterCol *= 0.5 + 0.5 * sunElev;
             vec3 transmitted = sceneCol * T + waterCol * (1.0 - T);
 
             color = mix(transmitted, reflection, fres);
@@ -206,7 +275,7 @@ export class Ocean {
             // crests only — kept gentle so it never washes the sea cyan.
             float back  = pow(max(dot(V, -sunDir), 0.0), 4.0);
             float crest = smoothstep(0.4, 1.8, vHeight) * max(N.y, 0.0);
-            color += uSSSColor * back * crest * sunElev * 0.35;
+            color += uSSSColor * back * crest * sunElev * uSSSStrength;
 
             // Crisp sun sparkle riding on the ripple normals.
             vec3 H = normalize(V + sunDir);
@@ -215,47 +284,76 @@ export class Ocean {
 
           } else {
             // ============ SEEN FROM BELOW (Snell's window) ============
+            // Looking up, most of the upward cone shows the whole sky refracted
+            // into a bright, rippling ceiling; only past the ~48.6° critical
+            // angle does it fall back to the (still bright, sunlit) water volume.
             vec3 I = normalize(vWorldPos - cameraPosition); // toward the surface
             vec3 refr = refract(I, -Ns, 1.333);             // water -> air
             float ci = abs(dot(Ns, I));
             float fres = fresnelF(ci, 0.02);
 
+            // Sunlit underwater ambient — bright turquoise near the surface,
+            // never near-black, so the ceiling reads clear instead of a porthole.
+            vec3 waterGlow = mix(uShallowColor, vec3(0.72, 0.92, 0.96), 0.35)
+                           * (0.55 + 0.85 * sunElev);
+
             if (dot(refr, refr) < 1e-4){
-              // Total internal reflection: mirror the underwater volume.
-              vec3 rl = reflect(I, -Ns);
-              color = mix(uDeepColor * 0.5, uShallowColor * 0.55,
-                          clamp(rl.y * 0.5 + 0.5, 0.0, 1.0));
+              color = waterGlow;                            // total internal reflection
             } else {
+              // The window: full sky, softened + lifted so it reads as a bright
+              // luminous ceiling rather than hard, high-contrast cloud shapes.
               vec3 sky = atmosphere(refr, sunDir);
-              vec3 internal = mix(uDeepColor * 0.5, uShallowColor * 0.55,
-                                  clamp(-I.y, 0.0, 1.0));
-              color = mix(sky, internal, fres);
+              float lum = max(sky.r, max(sky.g, sky.b));
+              sky = mix(sky, vec3(0.80, 0.9, 1.0) * lum, 0.4);   // soften clouds
+              sky *= 1.25;
+              color = mix(waterGlow, sky, 1.0 - fres);
             }
+            // Caustic shimmer dancing on the underside of the surface — the
+            // silvery rippling highlights that make it read as water, not sky.
+            float shimmer = fbm(vWorldPos.xz * 0.5 + uWindDir * uTime * 0.5, 4);
+            shimmer = smoothstep(0.52, 0.92, shimmer);
+            color += vec3(0.9, 0.98, 1.0) * shimmer * (1.0 - fres) * 0.35;
+
+            // Overall lift + a bright band along the window edge.
+            color += vec3(0.85, 0.95, 1.0) * (1.0 - fres) * 0.06;
           }
 
-          // ================= FOAM (both faces) =================
-          // Foamy whitecaps: broad foam on wave crests + extra on breaking folds
-          // + the shoreline band, carved into clumps by two octaves of advecting
-          // noise so it reads as churning foam rather than a flat white sheet.
-          float crest = smoothstep(uCrestFoamStart, uCrestFoamStart + 1.6, vHeight);
-          float fold  = smoothstep(uFoamThreshold, uFoamThreshold - uFoamSoftness, vFold);
-          float foam  = clamp(crest * 0.85 + fold * 0.7 + shoreFoam, 0.0, 1.0);
+          // ================= FOAM (layered, both faces) =================
+          // "Energy" = how much foam should exist here: from breaking folds,
+          // whitecap crests, and the shoreline band.
+          float breakE = smoothstep(uFoamThreshold, uFoamThreshold - uFoamSoftness, vFold);
+          float crestE = smoothstep(uCrestFoamStart, uCrestFoamStart + 1.6, vHeight);
+          float energy = clamp((breakE + crestE * 0.7 + shoreFoam) * uFoamCoverage, 0.0, 1.2);
 
-          // Multi-octave foam texture with a crisp edge (not a soft grey blob).
           vec2 fp = vWorldPos.xz;
-          vec2 flow = uWindDir * uTime * 0.5;
-          float ftex = fbm(fp * 0.5 + flow, 5) * 0.5
-                     + fbm(fp * 1.7 - flow * 1.2, 4) * 0.32
-                     + fbm(fp * 5.2 + flow * 0.5, 3) * 0.18;
-          foam *= smoothstep(0.46, 0.60, ftex);            // crisp cutoff
-          foam = max(foam, shoreFoam * smoothstep(0.30, 0.5, ftex));
+          vec2 flow = uWindDir * uTime * 0.4;
+          // Stretch noise along the wind so foam forms streaks / trails.
+          vec2 wperp = vec2(-uWindDir.y, uWindDir.x);
+          vec2 sp = vec2(dot(fp, uWindDir), dot(fp, wperp) * 3.0);
+          float tCoarse = fbm(sp * 0.12 + flow, 5);
+          float tMid    = fbm(fp * 0.8 - flow * 1.3, 4);
+          float tFine   = fbm(fp * 2.6 + flow * 0.7, 4);
+          float tex = tCoarse * 0.58 + tMid * 0.30 + tFine * 0.12;
 
-          // Fine bubbly structure in the foam itself.
-          float bubbles = 0.72 + 0.36 * fbm(fp * 9.0 - flow, 3);
-          color = mix(color, uFoamColor * bubbles, clamp(foam, 0.0, 1.0) * 0.96);
+          // Dissolve: dense cap where energy is high; only the highest noise
+          // peaks survive as it fades → soft, feathered, dissipating layers.
+          float thr  = 1.0 - clamp(energy, 0.0, 1.0);
+          float foam = smoothstep(thr - uFoamEdge, thr + uFoamEdge, tex);
+          foam *= smoothstep(0.0, 0.12, energy);
+
+          // A second, sparser layer of the brightest fresh foam on strong breaks.
+          float fresh = smoothstep(0.62, 0.95, tMid)
+                      * smoothstep(0.5, 1.0, breakE + shoreFoam);
+          foam = max(foam, fresh);
+
+          // Gentle bubble breakup; thin foam is translucent (water shows through).
+          float bubbles = 0.74 + 0.34 * fbm(fp * 4.5 - flow, 3);
+          vec3 foamCol = uFoamColor * bubbles;
+          float density = smoothstep(0.05, 0.75, foam);
+          foamCol = mix(mix(color, uFoamColor, 0.5), foamCol, density);
+          color = mix(color, foamCol, clamp(foam, 0.0, 1.0) * uFoamOpacity);
 
           // ================= HORIZON / DISTANCE =================
-          float dist = length(cameraPosition - vWorldPos);
           if (!underwater){
             vec3 horizonDir = normalize(vec3(-V.x, 0.02, -V.z));
             vec3 fogCol = atmosphere(horizonDir, sunDir);
