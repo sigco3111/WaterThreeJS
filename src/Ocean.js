@@ -77,6 +77,7 @@ export class Ocean {
       uSSSStrength: { value: c.sssStrength },
       uSSRStrength: { value: c.ssrStrength },
       uSunGlitter: { value: c.sunGlitter },
+      uCloudCover: { value: 1.0 },
       uProjMatrix: { value: new THREE.Matrix4() },
       uFoamThreshold: { value: c.foamThreshold },
       uFoamSoftness: { value: c.foamSoftness },
@@ -146,6 +147,7 @@ export class Ocean {
         uniform float uSSSStrength;
         uniform float uSSRStrength;
         uniform float uSunGlitter;
+        uniform float uCloudCover;
         uniform mat4  uProjMatrix;   // fragment prefix lacks projectionMatrix
         uniform float uFoamThreshold;
         uniform float uFoamSoftness;

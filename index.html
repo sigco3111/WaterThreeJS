@@ -58,6 +58,75 @@
       }
       #depth .k { opacity: 0.5; }
       #depth .v { color: #9be7ff; }
+
+      /* ---- Menu (lil-gui) — cinematic glass theme ---- */
+      .lil-gui {
+        --background-color: rgba(9, 20, 30, 0.55);
+        --text-color: #cfe6f2;
+        --title-background-color: rgba(6, 15, 23, 0.0);
+        --title-text-color: #eaf7fd;
+        --widget-color: rgba(160, 220, 255, 0.10);
+        --hover-color: rgba(120, 220, 255, 0.18);
+        --focus-color: rgba(120, 220, 255, 0.30);
+        --number-color: #7fe3ff;
+        --string-color: #9be7ff;
+        --slider-knob-color: #4fd3ff;
+        --slider-input-color: rgba(120, 220, 255, 0.22);
+        --font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --font-family-mono: ui-monospace, Menlo, Consolas, monospace;
+        --font-size: 12px;
+        --input-font-size: 12px;
+        --widget-height: 24px;
+        --padding: 9px;
+        --spacing: 6px;
+        --widget-border-radius: 7px;
+        --name-width: 46%;
+      }
+      .lil-gui.root {
+        top: 16px; right: 16px;
+        width: 296px;
+        border-radius: 14px;
+        border: 1px solid rgba(150, 220, 255, 0.16);
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        background: linear-gradient(180deg, rgba(14, 32, 46, 0.62), rgba(7, 17, 26, 0.62));
+        backdrop-filter: blur(16px) saturate(1.25);
+        -webkit-backdrop-filter: blur(16px) saturate(1.25);
+        overflow: hidden;
+      }
+      /* main title bar */
+      .lil-gui.root > .title {
+        font-weight: 600; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+        padding: 12px 12px;
+        color: #eaf7fd;
+        background: linear-gradient(90deg, rgba(79, 211, 255, 0.20), rgba(79, 211, 255, 0.02));
+        border-bottom: 1px solid rgba(150, 220, 255, 0.14);
+      }
+      .lil-gui.root > .title::before { content: "🌊 "; }
+      /* folder titles */
+      .lil-gui .title {
+        font-weight: 600; letter-spacing: 0.05em; color: #bfe6f5;
+        transition: background 0.14s ease, color 0.14s ease;
+      }
+      .lil-gui .title:hover { background: var(--hover-color); color: #eaf7fd; }
+      .lil-gui .children { padding-bottom: 2px; }
+      .lil-gui .controller { transition: background 0.12s ease; border-radius: 6px; }
+      .lil-gui .controller:hover { background: rgba(160, 220, 255, 0.05); }
+      .lil-gui .controller .name { opacity: 0.9; }
+      /* buttons */
+      .lil-gui .controller.function .widget button,
+      .lil-gui .controller.function .name {
+        color: #a9ecff; font-weight: 600; letter-spacing: 0.02em;
+      }
+      .lil-gui .controller.function:hover .name { color: #e2f7ff; }
+      /* slider fill accent */
+      .lil-gui .slider { border-radius: 6px; overflow: hidden; }
+      .lil-gui .slider .fill { background: linear-gradient(90deg, #1f8fd0, #4fd3ff); }
+      /* dropdown */
+      .lil-gui .controller.option .widget select { border-radius: 6px; font-weight: 600; }
+      /* scrollbar */
+      .lil-gui .children::-webkit-scrollbar { width: 8px; }
+      .lil-gui .children::-webkit-scrollbar-thumb { background: rgba(120,220,255,0.22); border-radius: 8px; }
+      @media (max-width: 640px) { .lil-gui.root { width: 240px; } }
     </style>
   </head>
   <body>
@@ -68,7 +137,7 @@
       <div><span class="k">DEPTH</span> &nbsp;<span class="v" id="depth-val">0.0 m</span></div>
     </div>
 
-    <div id="hint">Drag to look &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Head to the <b>island</b> &nbsp;·&nbsp; Dive <b>below the surface</b></div>
+    <div id="hint"><b>Double-click</b> water to drop objects &nbsp;·&nbsp; <b>Drag</b> them around &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Dive <b>below</b></div>
 
     <div id="boot">
       <h1>Ocean</h1>

@@ -9,6 +9,7 @@ export class Sky {
     this.uniforms = {
       uSunDir: { value: sunDir.clone() },
       uTime: { value: 0 },
+      uCloudCover: { value: 1.0 },
     };
 
     const material = new THREE.ShaderMaterial({
@@ -30,6 +31,7 @@ export class Sky {
         precision highp float;
         uniform vec3 uSunDir;
         uniform float uTime;
+        uniform float uCloudCover;
         varying vec3 vWorldDir;
         ${NOISE}
         ${ATMOSPHERE}

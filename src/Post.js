@@ -229,12 +229,34 @@ export class Post {
         }
       `,
     });
+
+    // ---- Volumetric-cloud composite (scene · transmittance + scatter) --------
+    this.sceneRT2 = halfFloatRT(width, height);
+    this.cloudCompositeMat = new THREE.ShaderMaterial({
+      uniforms: { tScene: { value: null }, tClouds: { value: null } },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        uniform sampler2D tScene;
+        uniform sampler2D tClouds;   // rgb = scatter (HDR), a = transmittance
+        void main(){
+          vec3 s = texture2D(tScene, vUv).rgb;
+          vec4 f = texture2D(tClouds, vUv);
+          gl_FragColor = vec4(s * f.a + f.rgb, 1.0);
+        }
+      `,
+    });
   }
 
   setSize(w, h) {
     const bw = Math.max(1, w >> 1);
     const bh = Math.max(1, h >> 1);
     this.sceneRT.setSize(w, h);
+    this.sceneRT2.setSize(w, h);
     this.brightRT.setSize(bw, bh);
     this.blurA.setSize(bw, bh);
     this.blurB.setSize(bw, bh);
@@ -261,8 +283,17 @@ export class Post {
     // 1) underwater volumetrics → sceneRT
     this._draw(this.underwaterMat, this.sceneRT);
 
+    // 1b) composite volumetric clouds over the (fogged) scene, HDR, before bloom
+    let sceneOut = this.sceneRT;
+    if (params.cloudTexture) {
+      this.cloudCompositeMat.uniforms.tScene.value = this.sceneRT.texture;
+      this.cloudCompositeMat.uniforms.tClouds.value = params.cloudTexture;
+      this._draw(this.cloudCompositeMat, this.sceneRT2);
+      sceneOut = this.sceneRT2;
+    }
+
     // 2) bright pass → brightRT
-    this.brightMat.uniforms.tDiffuse.value = this.sceneRT.texture;
+    this.brightMat.uniforms.tDiffuse.value = sceneOut.texture;
     this._draw(this.brightMat, this.brightRT);
 
     // 3) two blur iterations (H, V) x2
@@ -278,7 +309,7 @@ export class Post {
     }
 
     // 4) composite → screen
-    this.compositeMat.uniforms.tScene.value = this.sceneRT.texture;
+    this.compositeMat.uniforms.tScene.value = sceneOut.texture;
     this.compositeMat.uniforms.tBloom.value = this.blurB.texture;
     this.compositeMat.uniforms.uUnderwater.value = params.underwater ? 1 : 0;
     this._draw(this.compositeMat, null);

@@ -85,7 +85,7 @@ export const ATMOSPHERE = /* glsl */ `
       float base = fbm(cp, 5);
       float det  = fbm(cp * 2.9 + 4.0, 4);
       float density = base * 0.7 + det * 0.3;
-      float cov = smoothstep(0.48, 0.66, density);     // puffier, more opaque
+      float cov = smoothstep(0.48, 0.66, density) * uCloudCover; // faded when volumetric is on
       cov *= smoothstep(0.05, 0.26, up);               // thin out at the horizon
       // Self-shadowing: bright sunlit tops, cooler/darker bases.
       float shade = smoothstep(0.46, 0.82, density);

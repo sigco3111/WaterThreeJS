@@ -144,4 +144,56 @@ export class Island {
   setSun(sunDir) {
     this.uniforms.uSunDir.value.copy(sunDir);
   }
+
+  // CPU mirror of the GLSL islandHeight() above — the world-space terrain height
+  // at (x, z). Used for object–terrain collision (rest on the seabed / beach).
+  heightAt(x, z) {
+    const u = this.uniforms;
+    const cx = u.uCenter.value.x;
+    const cz = u.uCenter.value.y;
+    const d = Math.hypot(x - cx, z - cz);
+    const land = smoothstep(u.uRouter.value, u.uRinner.value, d);
+    let base = u.uSeabedY.value + (u.uPeakY.value - u.uSeabedY.value) * land; // mix
+    const n = fbm2(x * 0.02, z * 0.02, 5) * 4.0 + fbm2(x * 0.11, z * 0.11, 4) * 1.1;
+    base += n * (0.35 + 0.65 * land);
+    return base;
+  }
+}
+
+// --- CPU ports of the GLSL noise used by islandHeight() (common.js NOISE) ---
+const _fr = (v) => v - Math.floor(v);
+function _hash21(x, y) {
+  let px = _fr(x * 123.34);
+  let py = _fr(y * 456.21);
+  const dt = px * (px + 45.32) + py * (py + 45.32); // dot(p, p + 45.32)
+  px += dt;
+  py += dt;
+  return _fr(px * py);
+}
+function _noise(x, y) {
+  const px = Math.floor(x), py = Math.floor(y);
+  const fx = x - px, fy = y - py;
+  const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+  const uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+  const a = _hash21(px, py);
+  const b = _hash21(px + 1, py);
+  const c = _hash21(px, py + 1);
+  const e = _hash21(px + 1, py + 1);
+  const k1 = b - a, k2 = c - a, k3 = a - b - c + e;
+  return a + k1 * ux + k2 * uy + k3 * ux * uy;
+}
+function fbm2(x, y, oct) {
+  let amp = 0.5, sum = 0;
+  for (let i = 0; i < oct; i++) {
+    sum += amp * _noise(x, y);
+    const nx = 1.6 * x - 1.2 * y; // FBM_M = mat2(1.6, 1.2, -1.2, 1.6)
+    const ny = 1.2 * x + 1.6 * y;
+    x = nx; y = ny;
+    amp *= 0.5;
+  }
+  return sum;
+}
+function smoothstep(e0, e1, x) {
+  const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
+  return t * t * (3 - 2 * t);
 }
