@@ -28,7 +28,7 @@ export const OCEAN_CONFIG = {
   depthFalloff: 0.16,  // how fast the water body darkens with depth
   sssStrength: 0.35,   // subsurface translucency amount
   ssrStrength: 0.85,   // screen-space reflection blend (scene reflected on water)
-  sunGlitter: 0.35,    // shatters the reflected sun into sparkles (vs a solid streak)
+  sunGlitter: 0,       // shatters the reflected sun into sparkles (vs a solid streak)
   foamThreshold: 0.2,
   foamSoftness: 0.4,
   crestFoamStart: 1.4, // wave height (m) at which whitecaps begin (calm = rare)

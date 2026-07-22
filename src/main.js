@@ -154,7 +154,7 @@ const post = new Post(renderer, sizeW(), sizeH(), sunDir, OCEAN_CONFIG.deepColor
 
 // Volumetric sky clouds (off by default). When on, the flat procedural clouds
 // in the atmosphere fade back so the sky isn't doubled.
-const clouds = new Clouds(renderer, sizeW(), sizeH(), { scale: 0.5 });
+const clouds = new Clouds(renderer, sizeW(), sizeH(), { scale: 0.72 });
 function setCloudsEnabled(on) {
   clouds.enabled = on;
   const cover = on ? 0.25 : 1.0;
@@ -257,12 +257,11 @@ function refreshColorCtrls() {
   }
 }
 
-const fPre = gui.addFolder('Cinematic');
+const fPre = gui.addFolder('Cinematic').close();
 const presetProxy = { preset: 'Tropical Noon' };
 fPre.add(presetProxy, 'preset', Object.keys(PRESETS)).name('preset').onChange(applyPreset);
-fPre.open();
 
-const fSun = gui.addFolder('Time of day');
+const fSun = gui.addFolder('Time of day').close();
 fSun.add(sunParams, 'elevation', -3, 89, 0.5).name('sun elevation').onChange(applySun);
 fSun.add(sunParams, 'azimuth', 0, 360, 1).name('sun azimuth').onChange(applySun);
 
@@ -307,16 +306,16 @@ fFoam.add(ocean.uniforms.uCrestFoamStart, 'value', 0.3, 3.0, 0.05).name('whiteca
 fFoam.add(ocean.uniforms.uFoamThreshold, 'value', 0.0, 1.0, 0.02).name('breaking foam');
 fFoam.add(ocean.uniforms.uShoreFoamWidth, 'value', 0.0, 8.0, 0.1).name('shore foam width');
 
-const fObj = gui.addFolder('Objects');
+const fObj = gui.addFolder('Objects').close();
 fObj.add({ s: () => dropAtTarget('sphere') }, 's').name('drop sphere');
 fObj.add({ c: () => dropAtTarget('cube') }, 'c').name('drop cube');
 fObj.add({ x: () => bodies.clear() }, 'x').name('clear objects');
 fObj.add(bodies, 'gravity', 0, 45, 0.5).name('gravity');
-fObj.open();
 
 const fClouds = gui.addFolder('Volumetric clouds').close();
 const cu = clouds.uniforms;
-fClouds.add({ on: true }, 'on').name('enabled').onChange(setCloudsEnabled);
+fClouds.add({ on: false }, 'on').name('enabled').onChange(setCloudsEnabled);
+fClouds.add(cu.uSteps, 'value', 24, 96, 2).name('quality (steps)');
 fClouds.add(cu.uCoverage, 'value', 0.1, 0.95, 0.01).name('coverage');
 fClouds.add(cu.uDensity, 'value', 0.5, 6.0, 0.1).name('density');
 fClouds.add(cu.uNoiseScale, 'value', 0.002, 0.02, 0.0005).name('cloud size (inv)');

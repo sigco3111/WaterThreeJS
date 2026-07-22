@@ -9,7 +9,7 @@ import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 // self-shadowing, a Henyey–Greenstein phase for the backlit silver lining, and
 // a detail-erosion octave that frays the edges into wisps.
 export class Clouds {
-  constructor(renderer, width, height, { scale = 0.5 } = {}) {
+  constructor(renderer, width, height, { scale = 0.72 } = {}) {
     this.renderer = renderer;
     this.scale = scale;
     this.enabled = false;
@@ -35,23 +35,23 @@ export class Clouds {
 
         uHalfXZ: { value: 5000 },     // camera-centred slab half-extent
         uBase: { value: 380 },        // cloud-layer altitude
-        uHeight: { value: 340 },      // layer thickness
-        uHeightFalloff: { value: 0.72 }, // 1 = hug the base (rolling top)
-        uDensity: { value: 3.2 },
-        uCoverage: { value: 0.5 },
+        uHeight: { value: 150 },      // layer thickness
+        uHeightFalloff: { value: 0.38 }, // 1 = hug the base (rolling top)
+        uDensity: { value: 0.5 },
+        uCoverage: { value: 0.39 },
         uCoverageEdge: { value: 0.16 },
-        uNoiseScale: { value: 0.0055 }, // smaller = bigger clouds
-        uDetail: { value: 0.6 },
+        uNoiseScale: { value: 0.002 }, // smaller = bigger clouds
+        uDetail: { value: 0.16 },
         uDetailScale: { value: 4.0 },
         uEdgeFade: { value: 1600 },   // soft fade toward the slab walls
         uWindDir: { value: new THREE.Vector2(1, 0.35).normalize() },
         uWindSpeed: { value: 0.03 },
-        uSteps: { value: 48 },
+        uSteps: { value: 96 },
         uMaxSpan: { value: 4200 },
         uLightSteps: { value: 6 },
         uLightStepSize: { value: 34 },
         uAniso: { value: 0.6 },
-        uAmbient: { value: 0.45 },
+        uAmbient: { value: 1.0 },
         uSunStrength: { value: 2.7 },
         uFogColor: { value: new THREE.Color(0.42, 0.5, 0.62) }, // shadowed body
         uSunColor: { value: new THREE.Color(1.0, 0.95, 0.86) }, // lit / scattered
