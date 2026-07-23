@@ -413,28 +413,89 @@ export class Ocean {
     this.uniforms.uResolution.value.set(w, h);
   }
 
-  // CPU mirror of the vertical wave displacement so the app knows the exact
-  // surface height at any point (camera immersion, buoyancy, splash line).
+  // Exact CPU port of the GLSL hash21(vec2) in common.js.
+  _hash21(a, b) {
+    let px = fract(a * 123.34);
+    let py = fract(b * 456.21);
+    const d = px * (px + 45.32) + py * (py + 45.32);
+    px += d;
+    py += d;
+    return fract(px * py);
+  }
+
+  // Full Gerstner sample at a REST position (the same math the vertex shader's
+  // sampleOcean() runs). Fills `out` with the horizontal displacement (dx,dz),
+  // the vertical height, and the analytic surface normal (nx,ny,nz).
+  _gerstner(x, z, time, out) {
+    const u = this.uniforms;
+    const baseAngle = Math.atan2(u.uWindDir.value.y, u.uWindDir.value.x);
+    const count = u.uWaveCount.value | 0;
+    const choppy = u.uChoppy.value;
+    const speed = u.uSpeed.value;
+    const spread = u.uDirSpread.value;
+    let freq = u.uBaseFreq.value;
+    let amp = u.uAmplitude.value;
+
+    let dispX = 0, dispY = 0, dispZ = 0;
+    let nx = 0, ny = 1, nz = 0;
+    for (let i = 0; i < count; i++) {
+      const r0 = this._hash21(i, 1.7);
+      const r1 = this._hash21(i, 9.1);
+      const angle = baseAngle + (r0 * 2 - 1) * spread;
+      const dx = Math.cos(angle);
+      const dz = Math.sin(angle);
+      const w = freq;
+      const A = amp;
+      const phase = Math.sqrt(9.81 * w) * speed;
+      const Q = choppy / Math.max(w * A * count, 1e-3);
+      const arg = w * (dx * x + dz * z) + time * phase + r1 * 6.2831853;
+      const s = Math.sin(arg);
+      const c = Math.cos(arg);
+      const WA = w * A;
+      dispX += Q * A * dx * c;
+      dispZ += Q * A * dz * c;
+      dispY += A * s;
+      nx -= dx * WA * c;
+      nz -= dz * WA * c;
+      ny -= Q * WA * s;
+      freq *= u.uFreqMul.value;
+      amp *= u.uAmpMul.value;
+    }
+    const inv = 1 / Math.hypot(nx, ny, nz);
+    out.dx = dispX; out.dz = dispZ;
+    out.h = u.uSurfaceY.value + dispY;
+    out.nx = nx * inv; out.ny = ny * inv; out.nz = nz * inv;
+    return out;
+  }
+
+  // Height of the VISIBLE water surface directly above world point (x,z).
+  // Gerstner waves push vertices sideways, so the surface you see above (x,z)
+  // came from a rest position offset by the horizontal displacement. Invert
+  // that map with a few fixed-point iterations so buoyancy matches the crests.
+  surfaceSample(x, z, time, out = {}) {
+    let rx = x, rz = z;
+    for (let it = 0; it < 4; it++) {
+      this._gerstner(rx, rz, time, out);
+      rx = x - out.dx;
+      rz = z - out.dz;
+    }
+    // Final sample at the resolved rest position gives the height + normal
+    // of the water actually rendered above (x,z).
+    return this._gerstner(rx, rz, time, out);
+  }
+
+  // Vertical-only surface height (fast approximation; ignores choppiness).
+  // Kept for camera-immersion / splash queries where exactness is not needed.
   heightAt(x, z, time) {
     const u = this.uniforms;
-    // Exact port of the GLSL hash21(vec2) in common.js.
-    const hash21 = (a, b) => {
-      let px = fract(a * 123.34);
-      let py = fract(b * 456.21);
-      const d = px * (px + 45.32) + py * (py + 45.32);
-      px += d;
-      py += d;
-      return fract(px * py);
-    };
-
     const baseAngle = Math.atan2(u.uWindDir.value.y, u.uWindDir.value.x);
     let freq = u.uBaseFreq.value;
     let amp = u.uAmplitude.value;
     const count = u.uWaveCount.value | 0;
     let h = 0;
     for (let i = 0; i < count; i++) {
-      const r0 = hash21(i, 1.7);
-      const r1 = hash21(i, 9.1);
+      const r0 = this._hash21(i, 1.7);
+      const r1 = this._hash21(i, 9.1);
       const angle = baseAngle + (r0 * 2 - 1) * u.uDirSpread.value;
       const dx = Math.cos(angle);
       const dz = Math.sin(angle);

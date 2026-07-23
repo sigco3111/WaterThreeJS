@@ -14,6 +14,7 @@ export class FloatingBodies {
     this.bodies = [];
     this._n = new THREE.Vector3();
     this._q = new THREE.Quaternion();
+    this._surf = { dx: 0, dz: 0, h: 0, nx: 0, ny: 1, nz: 0 };
     this._sphereGeo = new THREE.SphereGeometry(1, 32, 24);
     this._boxGeo = new THREE.BoxGeometry(1.7, 1.7, 1.7); // half-extent 0.85
     this._palette = [0xff5b4a, 0xffd23f, 0x2ea6ff, 0x4ad991, 0xb06bff, 0xff8f3f, 0xf2f2f2];
@@ -73,7 +74,10 @@ export class FloatingBodies {
   _step(b, dt, time, ocean, terrainAt) {
     const GRAV = this.gravity;
     const p = b.mesh.position;
-    const wH = ocean.heightAt(p.x, p.z, time);
+    // Accurate visible-surface height + normal above the body (Gerstner-inverted,
+    // so the body sits on the crest you actually see, not a vertical-only guess).
+    const surf = ocean.surfaceSample(p.x, p.z, time, this._surf);
+    const wH = surf.h;
     const tH = terrainAt(p.x, p.z);
 
     // Vertical velocity of the water column the body sits on (material
@@ -82,11 +86,8 @@ export class FloatingBodies {
     const wVel = (wH - b.prevWH) / dt;
     b.prevWH = wH;
 
-    // Local wave normal (finite differences).
-    const e = 1.2;
-    const gx = ocean.heightAt(p.x + e, p.z, time) - ocean.heightAt(p.x - e, p.z, time);
-    const gz = ocean.heightAt(p.x, p.z + e, time) - ocean.heightAt(p.x, p.z - e, time);
-    this._n.set(-gx / (2 * e), 1.0, -gz / (2 * e)).normalize();
+    // Local wave normal straight from the Gerstner sample.
+    this._n.set(surf.nx, surf.ny, surf.nz);
 
     // Buoyancy: force ∝ submerged depth; balances gravity at eqDisp = 2·r·density.
     // Damped against the WATER'S velocity so the body rides a rising wave instead
@@ -95,7 +96,9 @@ export class FloatingBodies {
     const eqDisp = Math.max(2 * b.r * b.density, 0.3);
     const buoyK = GRAV / eqDisp;
     const wet = displaced / (2 * b.r);                 // 0 in air → 1 submerged
-    const damp = 9.0 * wet + 0.6;
+    // Near-critical damping (relative to the buoyancy stiffness) so bodies of
+    // any size settle onto the surface calmly instead of bobbing forever.
+    const damp = 2 * Math.sqrt(buoyK) * (0.9 * wet) + 0.5;
     const relVy = b.vy - (wet > 0.02 ? wVel : 0.0);
     let ay = -GRAV + buoyK * displaced - damp * relVy;
     b.vy += ay * dt;
