@@ -96,6 +96,15 @@ export class FloatingBodies {
     const eqDisp = Math.max(2 * b.r * b.density, 0.3);
     const buoyK = GRAV / eqDisp;
     const wet = displaced / (2 * b.r);                 // 0 in air → 1 submerged
+
+    // Splash burst: entering the water fast kicks up a decaying foam ring
+    // (read by the ocean shader's contact foam).
+    if (b.splash === undefined) b.splash = 0;
+    if (wet > 0.05 && (b.wet ?? 0) < 0.02 && b.vy < -3) {
+      b.splash = Math.min(2, b.splash - b.vy * 0.11);
+    }
+    b.splash *= Math.exp(-1.7 * dt);
+    b.wet = wet;
     // Near-critical damping (relative to the buoyancy stiffness) so bodies of
     // any size settle onto the surface calmly instead of bobbing forever.
     const damp = 2 * Math.sqrt(buoyK) * (0.9 * wet) + 0.5;

@@ -5,7 +5,10 @@ import {
   DETAIL_NORMAL,
   ATMOSPHERE,
   WATER_TINT,
+  CLOUD_SHADOW,
 } from './shaders/common.js';
+
+export const MAX_FOAM_BODIES = 16;
 
 const fract = (v) => v - Math.floor(v);
 
@@ -29,6 +32,8 @@ export const OCEAN_CONFIG = {
   sssStrength: 0.35,   // subsurface translucency amount
   ssrStrength: 0.85,   // screen-space reflection blend (scene reflected on water)
   sunGlitter: 0,       // shatters the reflected sun into sparkles (vs a solid streak)
+  roughness: 0.08,     // micro-roughness of the GGX sun specular (glint size)
+  contactFoam: 1.0,    // foam rings / wakes / splashes around floating objects
   foamThreshold: 0.2,
   foamSoftness: 0.4,
   crestFoamStart: 1.4, // wave height (m) at which whitecaps begin (calm = rare)
@@ -77,8 +82,22 @@ export class Ocean {
       uSSSStrength: { value: c.sssStrength },
       uSSRStrength: { value: c.ssrStrength },
       uSunGlitter: { value: c.sunGlitter },
+      uRoughness: { value: c.roughness },
       uCloudCover: { value: 1.0 },
       uProjMatrix: { value: new THREE.Matrix4() },
+
+      // contact foam sources (filled from FloatingBodies every frame)
+      uContactFoam: { value: c.contactFoam },
+      uBodyCount: { value: 0 },
+      uBodies: { value: Array.from({ length: MAX_FOAM_BODIES }, () => new THREE.Vector4()) },
+      uBodyVel: { value: Array.from({ length: MAX_FOAM_BODIES }, () => new THREE.Vector2()) },
+
+      // cloud shadows (synced from the volumetric cloud layer; 0 = off)
+      uCloudShadow: { value: 0.0 },
+      uCloudPlaneY: { value: 450.0 },
+      uCloudScale: { value: 0.002 },
+      uCloudCoverage: { value: 0.35 },
+      uCloudDrift: { value: new THREE.Vector3() },
       uFoamThreshold: { value: c.foamThreshold },
       uFoamSoftness: { value: c.foamSoftness },
       uCrestFoamStart: { value: c.crestFoamStart },
@@ -147,7 +166,12 @@ export class Ocean {
         uniform float uSSSStrength;
         uniform float uSSRStrength;
         uniform float uSunGlitter;
+        uniform float uRoughness;
         uniform float uCloudCover;
+        uniform float uContactFoam;
+        uniform int   uBodyCount;
+        uniform vec4  uBodies[${MAX_FOAM_BODIES}];   // x, z, radius, foam strength
+        uniform vec2  uBodyVel[${MAX_FOAM_BODIES}];  // horizontal velocity → wake direction
         uniform mat4  uProjMatrix;   // fragment prefix lacks projectionMatrix
         uniform float uFoamThreshold;
         uniform float uFoamSoftness;
@@ -165,6 +189,7 @@ export class Ocean {
         ${ATMOSPHERE}
         ${DETAIL_NORMAL}
         ${WATER_TINT}
+        ${CLOUD_SHADOW}
 
         varying vec3 vWorldPos;
         varying vec3 vNormal;
@@ -174,6 +199,12 @@ export class Ocean {
 
         float fresnelF(float c, float f0){
           return f0 + (1.0 - f0) * pow(clamp(1.0 - c, 0.0, 1.0), 5.0);
+        }
+        // GGX / Trowbridge-Reitz normal distribution — physical glint shape.
+        float dggx(float NoH, float a){
+          float a2 = a * a;
+          float d = (NoH * a2 - NoH) * NoH + 1.0;
+          return a2 / (3.14159265 * d * d);
         }
         float sceneEyeDepth(vec2 uv){
           float d = texture2D(uDepthTex, uv).x;
@@ -237,9 +268,12 @@ export class Ocean {
           vec2 screenUV = gl_FragCoord.xy / uResolution;
           vec3 color;
           float shoreFoam = 0.0;
+          float cs = 0.0;   // cloud shadow amount (0 = clear, 1 = shadowed)
 
           if (!underwater){
             // ================= ABOVE WATER =================
+            // Moving cloud shadows — big soft patches drifting across the sea.
+            cs = cloudShadowAmt(vWorldPos, sunDir);
             // Jitter the reflection normal with faded high-frequency sparkle so
             // the reflected sun shatters into moving glitter instead of a solid
             // streak (very visible on calm water at a low sunset sun).
@@ -287,12 +321,17 @@ export class Ocean {
             // crests only — kept gentle so it never washes the sea cyan.
             float back  = pow(max(dot(V, -sunDir), 0.0), 4.0);
             float crest = smoothstep(0.4, 1.8, vHeight) * max(N.y, 0.0);
-            color += uSSSColor * back * crest * sunElev * uSSSStrength;
+            color += uSSSColor * back * crest * sunElev * uSSSStrength * (1.0 - cs * 0.85);
 
-            // Crisp sun sparkle riding on the ripple normals.
+            // GGX sun glints: physically-shaped sparkle whose size follows the
+            // micro-roughness; slightly rougher in the distance so the horizon
+            // reads as a soft streak instead of aliasing fireflies.
             vec3 H = normalize(V + sunDir);
-            float spec = pow(max(dot(N, H), 0.0), 400.0);
-            color += vec3(1.0, 0.96, 0.86) * spec * 5.0 * sunElev;
+            float rough = clamp(uRoughness + (1.0 - detFade) * 0.10, 0.02, 0.6);
+            float D = dggx(max(dot(N, H), 0.0), rough * rough);
+            float fh = fresnelF(max(dot(H, V), 0.0), 0.02);
+            float sunNoL = max(dot(Ns, sunDir), 0.0);
+            color += vec3(1.0, 0.94, 0.82) * D * fh * sunNoL * 3.0 * sunElev * (1.0 - cs * 0.9);
 
           } else {
             // ============ SEEN FROM BELOW (Snell's window) ============
@@ -335,7 +374,31 @@ export class Ocean {
           // whitecap crests, and the shoreline band.
           float breakE = smoothstep(uFoamThreshold, uFoamThreshold - uFoamSoftness, vFold);
           float crestE = smoothstep(uCrestFoamStart, uCrestFoamStart + 1.6, vHeight);
-          float energy = clamp((breakE + crestE * 0.7 + shoreFoam) * uFoamCoverage, 0.0, 1.2);
+
+          // Contact foam: churn rings, trailing wakes and splash bursts around
+          // the floating objects (positions fed in every frame).
+          float contact = 0.0;
+          if (uContactFoam > 0.001){
+            for (int i = 0; i < ${MAX_FOAM_BODIES}; i++){
+              if (i >= uBodyCount) break;
+              vec4 B = uBodies[i];
+              if (B.w < 0.01) continue;
+              vec2 dp = vWorldPos.xz - B.xy;
+              vec2 v = uBodyVel[i];
+              float sp = length(v);
+              if (sp > 0.25){
+                // Fold trailing points onto a capsule behind the body → wake.
+                vec2 vd = v / sp;
+                float along = dot(dp, vd);
+                dp -= vd * clamp(along, -B.z * min(2.0 + sp * 0.9, 7.0), 0.0);
+              }
+              float q = length(dp) / max(B.z, 0.1);
+              contact += smoothstep(2.4, 0.85, q) * B.w;
+            }
+            contact = min(contact, 1.6) * uContactFoam;
+          }
+
+          float energy = clamp((breakE + crestE * 0.7 + shoreFoam + contact) * uFoamCoverage, 0.0, 1.2);
 
           vec2 fp = vWorldPos.xz;
           vec2 flow = uWindDir * uTime * 0.4;
@@ -355,18 +418,24 @@ export class Ocean {
 
           // A second, sparser layer of the brightest fresh foam on strong breaks.
           float fresh = smoothstep(0.62, 0.95, tMid)
-                      * smoothstep(0.5, 1.0, breakE + shoreFoam);
+                      * smoothstep(0.5, 1.0, breakE + shoreFoam + contact);
           foam = max(foam, fresh);
 
           // Gentle bubble breakup; thin foam is translucent (water shows through).
+          // Foam is diffuse — shade it with the sun so it has form, not flat white.
           float bubbles = 0.74 + 0.34 * fbm(fp * 4.5 - flow, 3);
-          vec3 foamCol = uFoamColor * bubbles;
+          float foamLight = 0.55 + 0.5 * max(dot(Ns, sunDir), 0.0);
+          vec3 foamCol = uFoamColor * bubbles * foamLight;
           float density = smoothstep(0.05, 0.75, foam);
           foamCol = mix(mix(color, uFoamColor, 0.5), foamCol, density);
           color = mix(color, foamCol, clamp(foam, 0.0, 1.0) * uFoamOpacity);
 
           // ================= HORIZON / DISTANCE =================
           if (!underwater){
+            // Cloud shadow dims the whole surface (water + foam) softly; the
+            // aerial haze mixed in below stays unshadowed, as in reality.
+            color *= 1.0 - cs * 0.30;
+
             vec3 horizonDir = normalize(vec3(-V.x, 0.02, -V.z));
             // Cap the haze colour: the sun disk is intentionally ×14 bright for
             // glints/bloom, but it must NOT leak into the distance fog or it

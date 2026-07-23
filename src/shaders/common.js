@@ -78,6 +78,17 @@ export const ATMOSPHERE = /* glsl */ `
     // Ground haze for reflection rays that point below the horizon.
     col = mix(col, vec3(0.05, 0.10, 0.15), smoothstep(0.0, -0.22, up));
 
+    // ---- High wispy cirrus streaks (above the cumulus, always present) ----
+    if (up > 0.02){
+      float tc = 2600.0 / max(up, 0.03);
+      vec2 cp2 = dir.xz * tc * 0.00035 + uTime * vec2(0.0035, 0.001);
+      // Anisotropic frequency stretches the noise into long combed filaments.
+      float ci = fbm(vec2(cp2.x * 0.55, cp2.y * 3.2), 4);
+      float cir = smoothstep(0.52, 0.82, ci) * smoothstep(0.02, 0.18, up);
+      vec3 cirCol = mix(vec3(0.98, 1.0, 1.06), vec3(1.15, 0.88, 0.68), (1.0 - sunElev) * 0.75);
+      col = mix(col, cirCol, cir * 0.30);
+    }
+
     // ---- Drifting cumulus clouds on a plane (also seen in reflections) ----
     if (up > 0.04){
       float t = 900.0 / max(up, 0.05);                 // ray → cloud plane
@@ -280,4 +291,47 @@ export const CAUSTICS = /* glsl */ `
 export const WATER_TINT = /* glsl */ `
   const vec3 ABSORB = vec3(0.45, 0.09, 0.04);   // red dies fast; blue travels but deep still darkens
   const vec3 SCATTER = vec3(0.11, 0.28, 0.36);  // in-scattered teal
+`;
+
+/* Cloud shadows on the sea: sample the SAME 3D fBm the volumetric clouds march
+   (same rotation matrix / lacunarity / drift), sliced at the layer's midplane
+   along the sun ray, so shadow patches line up with the clouds overhead and
+   drift with them. uCloudCoverage arrives pre-multiplied for the midplane. */
+export const CLOUD_SHADOW = /* glsl */ `
+  uniform float uCloudShadow;    // strength; 0 disables the whole path
+  uniform float uCloudPlaneY;    // altitude of the sampling plane
+  uniform float uCloudScale;     // clouds' uNoiseScale
+  uniform float uCloudCoverage;  // clouds' coverage at the midplane
+  uniform vec3  uCloudDrift;     // clouds' accumulated wind drift
+
+  float csHash13(vec3 p){
+    p = fract(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+  float csVnoise(vec3 x){
+    vec3 i = floor(x), f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(csHash13(i + vec3(0,0,0)), csHash13(i + vec3(1,0,0)), f.x),
+          mix(csHash13(i + vec3(0,1,0)), csHash13(i + vec3(1,1,0)), f.x), f.y),
+      mix(mix(csHash13(i + vec3(0,0,1)), csHash13(i + vec3(1,0,1)), f.x),
+          mix(csHash13(i + vec3(0,1,1)), csHash13(i + vec3(1,1,1)), f.x), f.y), f.z);
+  }
+  float csFbm(vec3 p){
+    float v = 0.0, a = 0.5;
+    mat3 m = mat3(0.0, 0.8, 0.6, -0.8, 0.36, -0.48, -0.6, -0.48, 0.64);
+    for (int i = 0; i < 4; i++) { v += a * csVnoise(p); p = m * p * 2.02; a *= 0.5; }
+    return v;
+  }
+
+  // Returns 0 = clear sky, 1 = fully shadowed.
+  float cloudShadowAmt(vec3 wp, vec3 sunDir){
+    if (uCloudShadow <= 0.001 || sunDir.y < 0.06) return 0.0;
+    vec3 p = wp + sunDir * ((uCloudPlaneY - wp.y) / sunDir.y);
+    float n = csFbm(p * uCloudScale + uCloudDrift);
+    float th = 1.0 - uCloudCoverage;
+    float d = smoothstep(th - 0.14, th + 0.22, n);
+    return d * uCloudShadow;
+  }
 `;

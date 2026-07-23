@@ -24,6 +24,7 @@ export class Post {
   constructor(renderer, width, height, sunDir, deepColor) {
     this.renderer = renderer;
     this.quad = new FullScreenQuad();
+    this.bloomStreak = 0.3; // anamorphic horizontal stretch of the bloom
 
     this.sceneRT = halfFloatRT(width, height);
     const bw = Math.max(1, width >> 1);
@@ -180,7 +181,9 @@ export class Post {
       `,
     });
 
-    // ---- Final composite: bloom add, exposure, ACES, sRGB, vignette ---------
+    // ---- Final composite: the film grade ------------------------------------
+    // Bloom add, chromatic aberration, exposure, ACES, saturation/contrast,
+    // film grain, vignette, sRGB — the "Hollywood print" of the HDR frame.
     this.compositeMat = new THREE.ShaderMaterial({
       uniforms: {
         tScene: { value: null },
@@ -188,7 +191,13 @@ export class Post {
         uBloom: { value: 0.65 },
         uExposure: { value: 1.05 },
         uUnderwater: { value: 0 },
-        uVignette: { value: 0.35 },
+        uVignette: { value: 0.35 },     // underwater depth vignette
+        uVignetteAir: { value: 0.16 },  // subtle cinematic edge falloff above water
+        uSaturation: { value: 1.06 },
+        uContrast: { value: 1.02 },
+        uGrain: { value: 0.05 },
+        uCA: { value: 0.5 },            // chromatic aberration amount (lens fringe)
+        uTime: { value: 0 },
       },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
@@ -203,6 +212,12 @@ export class Post {
         uniform float uExposure;
         uniform float uUnderwater;
         uniform float uVignette;
+        uniform float uVignetteAir;
+        uniform float uSaturation;
+        uniform float uContrast;
+        uniform float uGrain;
+        uniform float uCA;
+        uniform float uTime;
 
         vec3 aces(vec3 x){
           const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
@@ -213,19 +228,42 @@ export class Post {
                      1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055,
                      step(0.0031308, c));
         }
+        float grainHash(vec2 p){
+          return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+        }
 
         void main(){
-          vec3 c = texture2D(tScene, vUv).rgb;
+          vec2 q = vUv - 0.5;
+          float r2 = dot(q, q);
+
+          // Chromatic aberration: radial R/B fringe that grows toward the
+          // frame edges — reads as a real anamorphic lens, not a filter.
+          vec2 caOff = q * r2 * uCA * 0.012;
+          vec3 c;
+          c.r = texture2D(tScene, vUv + caOff).r;
+          c.g = texture2D(tScene, vUv).g;
+          c.b = texture2D(tScene, vUv - caOff).b;
+
           c += texture2D(tBloom, vUv).rgb * uBloom;
           c *= uExposure;
           c = aces(c);
 
-          // Gentle underwater vignette for depth.
-          vec2 q = vUv - 0.5;
-          float vig = 1.0 - dot(q, q) * uVignette * 2.0;
-          c *= mix(1.0, clamp(vig, 0.0, 1.0), uUnderwater);
+          // Grade: saturation then a gentle S-curve contrast around mid-grey.
+          float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+          c = mix(vec3(luma), c, uSaturation);
+          c = clamp((c - 0.5) * uContrast + 0.5, 0.0, 1.0);
 
-          gl_FragColor = vec4(toSRGB(c), 1.0);
+          // Film grain — animated, weighted toward the mid/shadow tones like
+          // real stock but gated out of near-black so it never reads as noise.
+          float gn = grainHash(vUv * vec2(1920.0, 1080.0) + fract(uTime * 13.7) * 91.0);
+          float grainAmt = uGrain * (0.35 + 0.65 * (1.0 - luma)) * smoothstep(0.0, 0.14, luma);
+          c += (gn - 0.5) * grainAmt;
+
+          // Vignette: subtle above water, heavier when submerged.
+          float vigAmt = mix(uVignetteAir, uVignette * 2.0, uUnderwater);
+          c *= clamp(1.0 - r2 * vigAmt * 2.0, 0.0, 1.0);
+
+          gl_FragColor = vec4(toSRGB(clamp(c, 0.0, 1.0)), 1.0);
         }
       `,
     });
@@ -296,11 +334,12 @@ export class Post {
     this.brightMat.uniforms.tDiffuse.value = sceneOut.texture;
     this._draw(this.brightMat, this.brightRT);
 
-    // 3) two blur iterations (H, V) x2
+    // 3) two blur iterations (H, V) x2 — the second horizontal pass is
+    // stretched by bloomStreak for a subtle anamorphic lens flare.
     let src = this.brightRT;
     for (let i = 0; i < 2; i++) {
       this.blurMat.uniforms.tDiffuse.value = src.texture;
-      this.blurMat.uniforms.uDir.value.set(1, 0);
+      this.blurMat.uniforms.uDir.value.set(i === 1 ? 1 + this.bloomStreak * 3 : 1, 0);
       this._draw(this.blurMat, this.blurA);
       this.blurMat.uniforms.tDiffuse.value = this.blurA.texture;
       this.blurMat.uniforms.uDir.value.set(0, 1);
@@ -312,6 +351,7 @@ export class Post {
     this.compositeMat.uniforms.tScene.value = sceneOut.texture;
     this.compositeMat.uniforms.tBloom.value = this.blurB.texture;
     this.compositeMat.uniforms.uUnderwater.value = params.underwater ? 1 : 0;
+    this.compositeMat.uniforms.uTime.value = params.time;
     this._draw(this.compositeMat, null);
   }
 }
