@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { t, setLanguage } from './i18n.js';
 import GUI from 'lil-gui';
 
 import { Sky } from './Sky.js';
@@ -187,42 +188,42 @@ function applySun() {
 //  Cinematic presets — curated sun + water + wave + post looks.
 // ---------------------------------------------------------------------------
 const PRESETS = {
-  'Tropical Noon': {
+  [t('presetTropicalNoon')]: {
     sun: { el: 60, az: 125 }, amplitude: 0.7, choppy: 0.5, speed: 1.0, waveCount: 26,
     exposure: 1.05, bloom: 0.5, clarity: 1.3, depthFalloff: 0.16, sunGlitter: 0, sss: 0.35,
     deep: '#063049', shallow: '#5fc6c2', foam: '#f6fdff', foamCoverage: 0.9, crestFoamStart: 1.4,
     fog: 1.0, shafts: 0.05,
     roughness: 0.06, cloudCoverage: 0.34, saturation: 1.08,
   },
-  'Golden Hour': {
+  [t('presetGoldenHour')]: {
     sun: { el: 8, az: 205 }, amplitude: 0.9, choppy: 0.6, speed: 0.9, waveCount: 26,
     exposure: 1.15, bloom: 0.95, clarity: 1.0, depthFalloff: 0.18, sunGlitter: 0.55, sss: 0.55,
     deep: '#08283b', shallow: '#3f9f9a', foam: '#fff1df', foamCoverage: 0.85, crestFoamStart: 1.5,
     fog: 1.0, shafts: 0.06,
     roughness: 0.09, cloudCoverage: 0.45, saturation: 1.1,
   },
-  'Crimson Sunset': {
+  [t('presetCrimsonSunset')]: {
     sun: { el: 1.5, az: 250 }, amplitude: 1.0, choppy: 0.7, speed: 0.95, waveCount: 24,
     exposure: 1.2, bloom: 1.15, clarity: 0.9, depthFalloff: 0.2, sunGlitter: 0.6, sss: 0.5,
     deep: '#0e1524', shallow: '#33707a', foam: '#ffe4cf', foamCoverage: 0.9, crestFoamStart: 1.4,
     fog: 1.1, shafts: 0.05,
     roughness: 0.11, cloudCoverage: 0.52, saturation: 1.12,
   },
-  'Blue Hour': {
+  [t('presetBlueHour')]: {
     sun: { el: 2.5, az: 292 }, amplitude: 0.6, choppy: 0.5, speed: 0.8, waveCount: 24,
     exposure: 0.9, bloom: 0.6, clarity: 1.0, depthFalloff: 0.2, sunGlitter: 0.4, sss: 0.3,
     deep: '#050f1e', shallow: '#295a72', foam: '#dbe8f2', foamCoverage: 0.9, crestFoamStart: 1.5,
     fog: 1.1, shafts: 0.04,
     roughness: 0.08, cloudCoverage: 0.42, saturation: 1.0,
   },
-  'Clear Dawn': {
+  [t('presetClearDawn')]: {
     sun: { el: 14, az: 95 }, amplitude: 0.55, choppy: 0.45, speed: 0.85, waveCount: 26,
     exposure: 1.05, bloom: 0.7, clarity: 1.4, depthFalloff: 0.15, sunGlitter: 0.45, sss: 0.4,
     deep: '#073246', shallow: '#63c7c0', foam: '#eefaff', foamCoverage: 0.85, crestFoamStart: 1.6,
     fog: 1.0, shafts: 0.06,
     roughness: 0.06, cloudCoverage: 0.28, saturation: 1.06,
   },
-  'Stormy Seas': {
+  [t('presetStormySeas')]: {
     sun: { el: 18, az: 100 }, amplitude: 1.8, choppy: 1.05, speed: 1.6, waveCount: 32,
     exposure: 0.95, bloom: 0.4, clarity: 0.7, depthFalloff: 0.22, sunGlitter: 0.2, sss: 0.25,
     deep: '#0a1a20', shallow: '#38666a', foam: '#eef3f5', foamCoverage: 1.05, crestFoamStart: 1.3,
@@ -260,7 +261,7 @@ function applyPreset(name) {
 // ---------------------------------------------------------------------------
 //  GUI
 // ---------------------------------------------------------------------------
-const gui = new GUI({ title: 'Ocean' });
+const gui = new GUI({ title: t('guiTitle') });
 
 const colorCtrls = [];
 function refreshColorCtrls() {
@@ -270,25 +271,25 @@ function refreshColorCtrls() {
   }
 }
 
-const fPre = gui.addFolder('Cinematic').close();
-const presetProxy = { preset: 'Tropical Noon' };
-fPre.add(presetProxy, 'preset', Object.keys(PRESETS)).name('preset').onChange(applyPreset);
-fPre.add({ cinema: false }, 'cinema').name('cinematic camera')
+const fPre = gui.addFolder(t('folderCinematic')).close();
+const presetProxy = { preset: t('presetTropicalNoon') };
+fPre.add(presetProxy, 'preset', Object.keys(PRESETS)).name(t('presetLabel')).onChange(applyPreset);
+fPre.add({ cinema: false }, 'cinema').name(t('cinematicCamera'))
   .onChange((v) => (controls.autoRotate = v));
 
-const fSun = gui.addFolder('Time of day').close();
-fSun.add(sunParams, 'elevation', -3, 89, 0.5).name('sun elevation').onChange(applySun);
-fSun.add(sunParams, 'azimuth', 0, 360, 1).name('sun azimuth').onChange(applySun);
+const fSun = gui.addFolder(t('folderTimeOfDay')).close();
+fSun.add(sunParams, 'elevation', -3, 89, 0.5).name(t('sunElevation')).onChange(applySun);
+fSun.add(sunParams, 'azimuth', 0, 360, 1).name(t('sunAzimuth')).onChange(applySun);
 
-const fWaves = gui.addFolder('Waves').close();
-fWaves.add(ocean.uniforms.uAmplitude, 'value', 0.1, 3.5, 0.05).name('amplitude');
-fWaves.add(ocean.uniforms.uChoppy, 'value', 0.0, 1.4, 0.02).name('choppiness');
-fWaves.add(ocean.uniforms.uWaveCount, 'value', 4, 40, 1).name('wave count');
-fWaves.add(ocean.uniforms.uSpeed, 'value', 0.0, 3.0, 0.05).name('speed');
-fWaves.add(ocean.uniforms.uDirSpread, 'value', 0.0, 1.6, 0.02).name('direction spread');
+const fWaves = gui.addFolder(t('folderWaves')).close();
+fWaves.add(ocean.uniforms.uAmplitude, 'value', 0.1, 3.5, 0.05).name(t('amplitude'));
+fWaves.add(ocean.uniforms.uChoppy, 'value', 0.0, 1.4, 0.02).name(t('choppiness'));
+fWaves.add(ocean.uniforms.uWaveCount, 'value', 4, 40, 1).name(t('waveCount'));
+fWaves.add(ocean.uniforms.uSpeed, 'value', 0.0, 3.0, 0.05).name(t('speed'));
+fWaves.add(ocean.uniforms.uDirSpread, 'value', 0.0, 1.6, 0.02).name(t('directionSpread'));
 fWaves
   .add({ wl: OCEAN_CONFIG.baseWavelength }, 'wl', 40, 320, 5)
-  .name('swell length')
+  .name(t('swellLength'))
   .onChange((v) => (ocean.uniforms.uBaseFreq.value = (2 * Math.PI) / v));
 
 // lil-gui colour control bound to a THREE.Color uniform (sRGB picker ⇄ linear).
@@ -298,69 +299,69 @@ function addColorCtrl(folder, uniform, name) {
   colorCtrls.push({ ctrl, proxy, uniform });
 }
 
-const fSurf = gui.addFolder('Surface').close();
-fSurf.add(ocean.uniforms.uDetailStrength, 'value', 0.0, 1.2, 0.02).name('ripple detail');
-fSurf.add(ocean.uniforms.uDetailScale, 'value', 0.05, 1.2, 0.01).name('ripple scale');
-fSurf.add(ocean.uniforms.uRefractStrength, 'value', 0.0, 0.12, 0.005).name('refraction');
-fSurf.add(ocean.uniforms.uSSRStrength, 'value', 0.0, 1.0, 0.02).name('reflections (SSR)');
-fSurf.add(ocean.uniforms.uSunGlitter, 'value', 0.0, 1.0, 0.02).name('sun glitter');
-fSurf.add(ocean.uniforms.uRoughness, 'value', 0.02, 0.5, 0.01).name('micro roughness');
+const fSurf = gui.addFolder(t('folderSurface')).close();
+fSurf.add(ocean.uniforms.uDetailStrength, 'value', 0.0, 1.2, 0.02).name(t('rippleDetail'));
+fSurf.add(ocean.uniforms.uDetailScale, 'value', 0.05, 1.2, 0.01).name(t('rippleScale'));
+fSurf.add(ocean.uniforms.uRefractStrength, 'value', 0.0, 0.12, 0.005).name(t('refraction'));
+fSurf.add(ocean.uniforms.uSSRStrength, 'value', 0.0, 1.0, 0.02).name(t('reflectionsSSR'));
+fSurf.add(ocean.uniforms.uSunGlitter, 'value', 0.0, 1.0, 0.02).name(t('sunGlitter'));
+fSurf.add(ocean.uniforms.uRoughness, 'value', 0.02, 0.5, 0.01).name(t('microRoughness'));
 
-const fColor = gui.addFolder('Water & colour').close();
-fColor.add(ocean.uniforms.uClarity, 'value', 0.3, 3.0, 0.05).name('clarity');
-fColor.add(ocean.uniforms.uDepthFalloff, 'value', 0.03, 0.5, 0.01).name('depth falloff');
-fColor.add(ocean.uniforms.uSSSStrength, 'value', 0.0, 1.5, 0.02).name('translucency');
-addColorCtrl(fColor, ocean.uniforms.uShallowColor, 'shallow');
-addColorCtrl(fColor, ocean.uniforms.uDeepColor, 'deep');
-addColorCtrl(fColor, ocean.uniforms.uFoamColor, 'foam');
+const fColor = gui.addFolder(t('folderColor')).close();
+fColor.add(ocean.uniforms.uClarity, 'value', 0.3, 3.0, 0.05).name(t('clarity'));
+fColor.add(ocean.uniforms.uDepthFalloff, 'value', 0.03, 0.5, 0.01).name(t('depthFalloff'));
+fColor.add(ocean.uniforms.uSSSStrength, 'value', 0.0, 1.5, 0.02).name(t('translucency'));
+addColorCtrl(fColor, ocean.uniforms.uShallowColor, t('shallow'));
+addColorCtrl(fColor, ocean.uniforms.uDeepColor, t('deep'));
+addColorCtrl(fColor, ocean.uniforms.uFoamColor, t('foam'));
 
-const fFoam = gui.addFolder('Foam').close();
-fFoam.add(ocean.uniforms.uFoamCoverage, 'value', 0.0, 2.0, 0.05).name('coverage');
-fFoam.add(ocean.uniforms.uFoamEdge, 'value', 0.02, 0.45, 0.01).name('softness / layers');
-fFoam.add(ocean.uniforms.uFoamOpacity, 'value', 0.3, 1.0, 0.02).name('opacity');
-fFoam.add(ocean.uniforms.uCrestFoamStart, 'value', 0.3, 3.0, 0.05).name('whitecap onset');
-fFoam.add(ocean.uniforms.uFoamThreshold, 'value', 0.0, 1.0, 0.02).name('breaking foam');
-fFoam.add(ocean.uniforms.uShoreFoamWidth, 'value', 0.0, 8.0, 0.1).name('shore foam width');
-fFoam.add(ocean.uniforms.uContactFoam, 'value', 0.0, 2.0, 0.05).name('object foam / wakes');
+const fFoam = gui.addFolder(t('folderFoam')).close();
+fFoam.add(ocean.uniforms.uFoamCoverage, 'value', 0.0, 2.0, 0.05).name(t('coverage'));
+fFoam.add(ocean.uniforms.uFoamEdge, 'value', 0.02, 0.45, 0.01).name(t('softnessLayers'));
+fFoam.add(ocean.uniforms.uFoamOpacity, 'value', 0.3, 1.0, 0.02).name(t('opacity'));
+fFoam.add(ocean.uniforms.uCrestFoamStart, 'value', 0.3, 3.0, 0.05).name(t('whitecapOnset'));
+fFoam.add(ocean.uniforms.uFoamThreshold, 'value', 0.0, 1.0, 0.02).name(t('breakingFoam'));
+fFoam.add(ocean.uniforms.uShoreFoamWidth, 'value', 0.0, 8.0, 0.1).name(t('shoreFoamWidth'));
+fFoam.add(ocean.uniforms.uContactFoam, 'value', 0.0, 2.0, 0.05).name(t('objectFoamWakes'));
 
-const fObj = gui.addFolder('Objects').close();
-fObj.add({ s: () => dropAtTarget('sphere') }, 's').name('drop sphere');
-fObj.add({ c: () => dropAtTarget('cube') }, 'c').name('drop cube');
-fObj.add({ x: () => bodies.clear() }, 'x').name('clear objects');
-fObj.add(bodies, 'gravity', 0, 45, 0.5).name('gravity');
+const fObj = gui.addFolder(t('folderObjects')).close();
+fObj.add({ s: () => dropAtTarget('sphere') }, 's').name(t('dropSphere'));
+fObj.add({ c: () => dropAtTarget('cube') }, 'c').name(t('dropCube'));
+fObj.add({ x: () => bodies.clear() }, 'x').name(t('clearObjects'));
+fObj.add(bodies, 'gravity', 0, 45, 0.5).name(t('gravity'));
 
-const fClouds = gui.addFolder('Volumetric clouds').close();
+const fClouds = gui.addFolder(t('folderClouds')).close();
 const cu = clouds.uniforms;
-fClouds.add({ on: true }, 'on').name('enabled').onChange(setCloudsEnabled);
-fClouds.add(cu.uSteps, 'value', 16, 80, 2).name('quality (steps)');
-fClouds.add(cu.uCoverage, 'value', 0.1, 0.95, 0.01).name('coverage');
-fClouds.add(cu.uDensity, 'value', 0.2, 3.0, 0.05).name('density');
-fClouds.add(cu.uNoiseScale, 'value', 0.002, 0.02, 0.0005).name('cloud size (inv)');
-fClouds.add(cu.uHeightFalloff, 'value', 0.0, 1.0, 0.02).name('roundness');
-fClouds.add(cu.uDetail, 'value', 0.0, 1.0, 0.02).name('wispiness');
-fClouds.add(cu.uBase, 'value', 120, 900, 10).name('altitude');
-fClouds.add(cu.uHeight, 'value', 100, 700, 10).name('thickness');
-fClouds.add(cu.uWindSpeed, 'value', 0.0, 0.15, 0.005).name('wind speed');
-fClouds.add(cu.uSunStrength, 'value', 0.5, 6.0, 0.1).name('sun strength');
-fClouds.add(cu.uAmbient, 'value', 0.0, 1.2, 0.02).name('ambient');
-fClouds.add(cloudShadowP, 'strength', 0.0, 1.0, 0.02).name('sea shadows');
+fClouds.add({ on: true }, 'on').name(t('enabled')).onChange(setCloudsEnabled);
+fClouds.add(cu.uSteps, 'value', 16, 80, 2).name(t('qualitySteps'));
+fClouds.add(cu.uCoverage, 'value', 0.1, 0.95, 0.01).name(t('coverage'));
+fClouds.add(cu.uDensity, 'value', 0.2, 3.0, 0.05).name(t('density'));
+fClouds.add(cu.uNoiseScale, 'value', 0.002, 0.02, 0.0005).name(t('cloudSizeInv'));
+fClouds.add(cu.uHeightFalloff, 'value', 0.0, 1.0, 0.02).name(t('roundness'));
+fClouds.add(cu.uDetail, 'value', 0.0, 1.0, 0.02).name(t('wispiness'));
+fClouds.add(cu.uBase, 'value', 120, 900, 10).name(t('altitude'));
+fClouds.add(cu.uHeight, 'value', 100, 700, 10).name(t('thickness'));
+fClouds.add(cu.uWindSpeed, 'value', 0.0, 0.15, 0.005).name(t('windSpeed'));
+fClouds.add(cu.uSunStrength, 'value', 0.5, 6.0, 0.1).name(t('sunStrength'));
+fClouds.add(cu.uAmbient, 'value', 0.0, 1.2, 0.02).name(t('ambient'));
+fClouds.add(cloudShadowP, 'strength', 0.0, 1.0, 0.02).name(t('seaShadows'));
 
-const fUnder = gui.addFolder('Underwater').close();
-fUnder.add(post.underwaterMat.uniforms.uShaftDensity, 'value', 0.0, 0.2, 0.005).name('god-ray density');
-fUnder.add(post.underwaterMat.uniforms.uFogStrength, 'value', 0.0, 2.0, 0.05).name('fog strength');
+const fUnder = gui.addFolder(t('folderUnderwater')).close();
+fUnder.add(post.underwaterMat.uniforms.uShaftDensity, 'value', 0.0, 0.2, 0.005).name(t('godRayDensity'));
+fUnder.add(post.underwaterMat.uniforms.uFogStrength, 'value', 0.0, 2.0, 0.05).name(t('fogStrength'));
 
-const fPost = gui.addFolder('Post').close();
-fPost.add(post.compositeMat.uniforms.uExposure, 'value', 0.3, 2.0, 0.02).name('exposure');
-fPost.add(post.compositeMat.uniforms.uBloom, 'value', 0.0, 2.0, 0.02).name('bloom');
-fPost.add(post, 'bloomStreak', 0.0, 1.0, 0.02).name('anamorphic streak');
-fPost.add(post.compositeMat.uniforms.uSaturation, 'value', 0.5, 1.6, 0.02).name('saturation');
-fPost.add(post.compositeMat.uniforms.uContrast, 'value', 0.8, 1.3, 0.01).name('contrast');
-fPost.add(post.compositeMat.uniforms.uGrain, 'value', 0.0, 0.2, 0.005).name('film grain');
-fPost.add(post.compositeMat.uniforms.uCA, 'value', 0.0, 2.0, 0.05).name('lens fringe');
-fPost.add(post.compositeMat.uniforms.uVignetteAir, 'value', 0.0, 0.6, 0.02).name('vignette');
+const fPost = gui.addFolder(t('folderPost')).close();
+fPost.add(post.compositeMat.uniforms.uExposure, 'value', 0.3, 2.0, 0.02).name(t('exposure'));
+fPost.add(post.compositeMat.uniforms.uBloom, 'value', 0.0, 2.0, 0.02).name(t('bloom'));
+fPost.add(post, 'bloomStreak', 0.0, 1.0, 0.02).name(t('anamorphicStreak'));
+fPost.add(post.compositeMat.uniforms.uSaturation, 'value', 0.5, 1.6, 0.02).name(t('saturation'));
+fPost.add(post.compositeMat.uniforms.uContrast, 'value', 0.8, 1.3, 0.01).name(t('contrast'));
+fPost.add(post.compositeMat.uniforms.uGrain, 'value', 0.0, 0.2, 0.005).name(t('filmGrain'));
+fPost.add(post.compositeMat.uniforms.uCA, 'value', 0.0, 2.0, 0.05).name(t('lensFringe'));
+fPost.add(post.compositeMat.uniforms.uVignetteAir, 'value', 0.0, 0.6, 0.02).name(t('vignette'));
 
-gui.add({ dive: () => diveTo(-12) }, 'dive').name('▼ dive under');
-gui.add({ surface: () => diveTo(14) }, 'surface').name('▲ back to surface');
+gui.add({ dive: () => diveTo(-12) }, 'dive').name(t('diveUnder'));
+gui.add({ surface: () => diveTo(14) }, 'surface').name(t('backToSurface'));
 
 function diveTo(y) {
   // Smoothly move the camera + target across the surface.
@@ -578,9 +579,9 @@ function animate() {
 
   // --- HUD ---
   const depthBelow = surfaceH - camera.position.y;
-  depthStateEl.textContent = underwater ? 'BELOW' : 'ABOVE';
+  depthStateEl.textContent = underwater ? t('stateBelow') : t('stateAbove');
   depthStateEl.style.color = underwater ? '#7fe0d0' : '#9be7ff';
-  depthValEl.textContent = (underwater ? depthBelow : camera.position.y).toFixed(1) + ' m';
+  depthValEl.textContent = (underwater ? depthBelow : camera.position.y).toFixed(1) + t('depthUnit');
 
   frame++;
   if (frame === 2) {
