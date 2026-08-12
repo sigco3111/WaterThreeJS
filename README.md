@@ -8,7 +8,7 @@
 
 | 항목 | URL |
 |---|---|
-| 🌐 **라이브 데모** | **<https://waterthreejs.vercel.app>** |
+| 🌐 **라이브 데모** | **<https://sigco3111.github.io/WaterThreeJS>** |
 | 📦 **이 저장소 (한국어 fork)** | <https://github.com/sigco3111/WaterThreeJS> |
 | ⭐ **원본 저장소 (출처)** | <https://github.com/achrefelouafi/WaterThreeJS> |
 
@@ -18,7 +18,7 @@
 
 ## ✨ 라이브 데모 둘러보기
 
-브라우저에서 **<https://waterthreejs.vercel.app>** 을 열면 즉시 바다를 만날 수 있습니다.
+브라우저에서 **<https://sigco3111.github.io/WaterThreeJS>** 을 열면 즉시 바다를 만날 수 있습니다.
 
 **조작 방법**
 
@@ -69,7 +69,7 @@
 - **🔄 이중 언어 지원** — `src/i18n.js` 모듈로 한국어 / 영어 토글 가능 (`setLanguage('en')` 호출)
 - **🛡️ 식별자 침투 0건** — 함수명 / 변수명 / 셰이더 유니폼은 원본 그대로 보존 (예: `uTime`, `getWorldPosition`, `requestAnimationFrame` 등 망가짐 없음)
 - **✅ 빌드 통과 검증** — `pnpm build` exit 0, 654KB / 170KB gzip
-- **🚀 Vercel 프로덕션 배포** — `<https://waterthreejs.vercel.app>` (CDN, 자동 HTTPS)
+- **🚀 Vercel 프로덕션 배포** — `<https://sigco3111.github.io/WaterThreeJS>` (CDN, 자동 HTTPS)
 
 ### 한국어화 번역 매핑 예시
 
@@ -336,7 +336,7 @@ vec3 T = exp(-(ABSORB / clarity) * thickness);   // ABSORB = (0.45, 0.09, 0.04)
 
 ### 5️⃣ Vercel 자동 도메인 사용
 
-CLI 가 준 첫 URL (`waterthreejs-2hqmg7jxk-sigco3111s-projects.vercel.app`) 은 Production Deployment Protection SSO 가드가 걸려 302 → 로그인 리다이렉트. **자동 할당된 production 도메인** (`waterthreejs.vercel.app`) 은 보호 없음 — 일반 사용자 접근용.
+CLI 가 준 첫 URL (`waterthreejs-2hqmg7jxk-sigco3111s-projects.vercel.app`) 은 Production Deployment Protection SSO 가드가 걸려 302 → 로그인 리다이렉트. **자동 할당된 production 도메인** (`sigco3111.github.io/WaterThreeJS`) 은 보호 없음 — 일반 사용자 접근용.
 
 ---
 
@@ -412,6 +412,6 @@ SOFTWARE.
 | **원본 HEAD** | `4f85f4a` (technical details) |
 | **한국어 fork HEAD** | `d0e5cfb` (docs: README 한국어 상세화) |
 | **배포 플랫폼** | Vercel |
-| **라이브 도메인** | <https://waterthreejs.vercel.app> |
+| **라이브 도메인** | <https://sigco3111.github.io/WaterThreeJS> |
 
 🌊 **즐거운 바다 감상 되세요!**
