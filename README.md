@@ -1,9 +1,19 @@
-# WaterThreeJS
+# WaterThreeJS (한국어 한글판)
+
+> 🌊 [achrefelouafi/WaterThreeJS](https://github.com/achrefelouafi/WaterThreeJS)의 한국어 fork입니다. 라이브 데모: **<https://waterthreejs.vercel.app>**
 
 A production-quality, real-time **ocean** rendered with [Three.js](https://threejs.org/) —
 above *and* below the surface. Everything is procedural (no textures, no asset
 downloads): the waves, the sky, the caustics and the volumetric light are all
 generated in shaders.
+
+## 한국어판 추가 사항 (sigco3111 fork)
+
+- **i18n.js** — 한국어 / 영어 이중 언어 모듈 (KO 64개 키 + EN 미러)
+- **전체 GUI 한글화** — lil-gui 폴더 10개, 컨트롤 50개, 프리셋 6종 모두 한국어로
+- **HUD / boot 화면 한글화** — `<html lang="ko">`, boot h1, hint, depth indicator (수면 위 / 수면 아래)
+- **식별자 침투 0건** — 함수/변수명은 원본 그대로 보존
+- 빌드 통과 (`pnpm build`, 654KB / 170KB gzip)
 
 ## Features
 
