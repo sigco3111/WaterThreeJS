@@ -9,7 +9,6 @@
 | 항목 | URL |
 |---|---|
 | 🌐 **라이브 데모** | **<https://sigco3111.github.io/WaterThreeJS>** |
-| 📦 **이 저장소 (한국어 fork)** | <https://github.com/sigco3111/WaterThreeJS> |
 | ⭐ **원본 저장소 (출처)** | <https://github.com/achrefelouafi/WaterThreeJS> |
 
 > 본 저장소는 [achrefelouafi/WaterThreeJS](https://github.com/achrefelouafi/WaterThreeJS) 의 **한국어 fork** 입니다. 원본 코드와 라이선스(MIT)를 그대로 보존하면서 사용자 인터페이스만 한글로 번역·개선했습니다.
